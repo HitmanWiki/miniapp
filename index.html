@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GHOSTWIRE Verify</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/index.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -22,7 +21,9 @@
         .container { max-width: 350px; width: 100%; }
         h1 { font-size: 56px; margin-bottom: 5px; }
         h3 { color: #aaa; margin-bottom: 10px; font-weight: normal; }
-        p { color: #777; font-size: 13px; margin-bottom: 30px; }
+        p { color: #777; font-size: 13px; margin-bottom: 15px; }
+        .steps { text-align: left; color: #aaa; font-size: 13px; margin: 20px 0; line-height: 2; }
+        .steps span { color: #6c5ce7; font-weight: bold; margin-right: 5px; }
         button {
             background: #6c5ce7;
             color: white;
@@ -32,15 +33,26 @@
             font-size: 18px;
             cursor: pointer;
             width: 100%;
+            margin: 5px 0;
         }
         button:active { transform: scale(0.97); }
-        button:disabled { background: #444; }
+        .secondary { background: #333; }
+        input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid #444;
+            background: #111133;
+            color: white;
+            font-size: 14px;
+            margin: 10px 0;
+            text-align: center;
+        }
         #status {
-            margin-top: 20px;
+            margin-top: 15px;
             font-size: 14px;
             color: #aaa;
-            min-height: 50px;
-            padding: 10px;
+            min-height: 30px;
         }
     </style>
 </head>
@@ -48,63 +60,64 @@
     <div class="container">
         <h1>👻</h1>
         <h3>GHOSTWIRE Verification</h3>
-        <p>Connect Phantom to verify ownership</p>
         
-        <button id="btn" onclick="verify()">Connect Phantom</button>
-        <div id="status">Click to connect</div>
+        <div id="step1">
+            <p>Verify you hold GHOSTWIRE tokens</p>
+            
+            <div class="steps">
+                <span>1.</span> Open Phantom app<br>
+                <span>2.</span> Tap Settings → Sign Message<br>
+                <span>3.</span> Sign: <b id="msgDisplay">Loading...</b><br>
+                <span>4.</span> Paste signature below
+            </div>
+            
+            <button onclick="openPhantom()">👻 Open Phantom App</button>
+            
+            <input type="text" id="sigInput" placeholder="Paste signature from Phantom...">
+            <input type="text" id="walletInput" placeholder="Your wallet address...">
+            <button onclick="submitVerification()">Submit Verification</button>
+            
+            <div id="status"></div>
+        </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
+        
+        // Generate unique message
+        const message = `GHOSTWIRE_VERIFY_${Date.now()}`;
+        document.getElementById('msgDisplay').innerText = message;
 
-        async function verify() {
-            const btn = document.getElementById('btn');
+        function openPhantom() {
+            // Open Phantom app via deep link
+            const encodedMsg = encodeURIComponent(message);
+            window.open(`https://phantom.app/ul/v1/signMessage?message=${encodedMsg}`, '_blank');
+            document.getElementById('status').innerText = '✅ Phantom opened! Sign the message, then paste signature below.';
+        }
+
+        async function submitVerification() {
+            const signature = document.getElementById('sigInput').value.trim();
+            const wallet = document.getElementById('walletInput').value.trim();
             const status = document.getElementById('status');
             
-            btn.disabled = true;
-            status.innerText = '⏳ Looking for Phantom...';
-            
-            const provider = window.phantom?.solana;
-            
-            if (!provider || !provider.isPhantom) {
-                status.innerHTML = '❌ Phantom not found!<br><small>Install Phantom and open in Telegram</small>';
-                btn.disabled = false;
+            if (!signature || !wallet) {
+                status.innerText = '❌ Please enter both wallet address and signature';
                 return;
             }
             
-            try {
-                status.innerText = '⏳ Connecting...';
-                const resp = await provider.connect();
-                const wallet = resp.publicKey.toString();
-                
-                const message = `GHOSTWIRE_VERIFY_${Date.now()}`;
-                const encodedMessage = new TextEncoder().encode(message);
-                
-                status.innerText = '✍️ Sign message in Phantom...';
-                
-                const signedMessage = await provider.signMessage(encodedMessage, "utf8");
-                
-                // Use bs58 encoding for Solana compatibility
-                const signature = bs58.encode(signedMessage.signature);
-                
-                status.innerText = '✅ Verified!';
-                
-                tg.sendData(JSON.stringify({
-                    action: 'verify_wallet',
-                    wallet: wallet,
-                    signature: signature,
-                    message: message
-                }));
-                
-                setTimeout(() => tg.close(), 600);
-                
-            } catch (err) {
-                console.error(err);
-                status.innerText = '❌ Failed! Try again.';
-                btn.disabled = false;
-            }
+            status.innerText = '⏳ Submitting...';
+            
+            tg.sendData(JSON.stringify({
+                action: 'verify_wallet',
+                wallet: wallet,
+                signature: signature,
+                message: message
+            }));
+            
+            status.innerText = '✅ Submitted! Closing...';
+            setTimeout(() => tg.close(), 800);
         }
     </script>
 </body>
