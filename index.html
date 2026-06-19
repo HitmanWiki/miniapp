@@ -19,8 +19,8 @@
             padding: 20px;
         }
         .container { max-width: 350px; width: 100%; }
-        h1 { font-size: 48px; margin-bottom: 5px; }
-        h3 { color: #aaa; margin-bottom: 25px; font-weight: normal; }
+        h1 { font-size: 48px; }
+        h3 { color: #aaa; margin: 10px 0 25px; font-weight: normal; }
         button {
             background: #6c5ce7;
             color: white;
@@ -31,22 +31,17 @@
             cursor: pointer;
             width: 100%;
         }
-        #status {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #aaa;
-            min-height: 40px;
-            line-height: 1.6;
-        }
+        button:disabled { background: #444; }
+        #status { margin-top: 20px; font-size: 14px; color: #aaa; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>👻</h1>
-        <h3>GHOSTWIRE Verification</h3>
+        <h3>Verify GHOSTWIRE</h3>
         
-        <button id="btn" onclick="verify()">🔐 Sign with Phantom</button>
-        <div id="status">Tap to verify with Phantom</div>
+        <button id="btn" onclick="verify()">Connect Phantom</button>
+        <div id="status"></div>
     </div>
 
     <script>
@@ -58,59 +53,33 @@
             const btn = document.getElementById('btn');
             const status = document.getElementById('status');
             
-            btn.disabled = true;
+            const provider = window.phantom?.solana;
             
-            // Generate message
-            const message = `GHOSTWIRE_VERIFY_${Date.now()}`;
-            const encodedMsg = encodeURIComponent(message);
-            
-            // Open Phantom to sign
-            status.innerText = 'Opening Phantom...';
-            window.location.href = `https://phantom.app/ul/v1/signMessage?message=${encodedMsg}&redirect=closed`;
-            
-            // After user signs and comes back, show instruction
-            setTimeout(() => {
-                status.innerHTML = `
-                    ✅ After signing in Phantom:<br>
-                    📋 Copy the signature<br>
-                    📤 Come back and paste below
-                `;
-                
-                // Show input for signature
-                document.getElementById('btn').style.display = 'none';
-                document.getElementById('container').innerHTML += `
-                    <input type="text" id="sigInput" placeholder="Paste signature here..." 
-                           style="width:100%;padding:14px;border-radius:10px;border:1px solid #444;
-                                  background:#111133;color:white;font-size:14px;margin:10px 0;text-align:center;">
-                    <input type="text" id="walletInput" placeholder="Your wallet address..." 
-                           style="width:100%;padding:14px;border-radius:10px;border:1px solid #444;
-                                  background:#111133;color:white;font-size:14px;margin:10px 0;text-align:center;">
-                    <button onclick="submit()" style="background:#6c5ce7;color:white;border:none;
-                            padding:16px;border-radius:14px;font-size:16px;width:100%;cursor:pointer;">
-                        Submit
-                    </button>
-                `;
-            }, 2000);
-        }
-
-        function submit() {
-            const sig = document.getElementById('sigInput').value.trim();
-            const wallet = document.getElementById('walletInput').value.trim();
-            
-            if (!sig || !wallet) {
-                document.getElementById('status').innerText = '❌ Fill both fields';
+            if (!provider?.isPhantom) {
+                status.innerText = '❌ Install Phantom wallet';
                 return;
             }
             
-            tg.sendData(JSON.stringify({
-                action: 'verify_wallet',
-                wallet: wallet,
-                signature: sig,
-                message: document.getElementById('status').dataset.message || ''
-            }));
-            
-            document.getElementById('status').innerText = '✅ Submitted!';
-            setTimeout(() => tg.close(), 600);
+            try {
+                btn.disabled = true;
+                status.innerText = 'Connecting...';
+                
+                const resp = await provider.connect();
+                const wallet = resp.publicKey.toString();
+                
+                status.innerText = '✅ Connected!';
+                
+                tg.sendData(JSON.stringify({
+                    action: 'verify_wallet',
+                    wallet: wallet
+                }));
+                
+                setTimeout(() => tg.close(), 500);
+                
+            } catch (e) {
+                status.innerText = '❌ Try again';
+                btn.disabled = false;
+            }
         }
     </script>
 </body>
